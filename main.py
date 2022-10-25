@@ -1,3 +1,4 @@
+import hashlib
 import random
 
 from cryptography.hazmat.backends import default_backend
@@ -29,22 +30,21 @@ bob_dice = random.randint(1, 6)
 
 
 def printt(msg: str) -> None:
-    print(msg + " (Press enter)")
+    print(msg + "\n(Press enter)")
     input()
 
 
-def hash_dice(dice: str, rand: str) -> int:
-    return int(dice, 2) ^ int(rand, 2)
+def hash_com(dice: int, rand: int) -> bytes:
+    return hashlib.sha512(str(str(rand) + str(dice)).encode()).digest()
 
 
-alice_dice_to_bits = f'{alice_dice:08b}'
-alice_random_bit = f'{random.randint(1, 1000):08b}'
-alice_dice_hashed = f'{hash_dice(alice_dice_to_bits, alice_random_bit):08b}'
+alice_random_bit = random.randint(1, 1000)
+alice_dice_hashed = hash_com(alice_dice, alice_random_bit)
 
 
-def encrypt(pk, msg: str) -> str:
+def encrypt(pk, msg: bytes) -> str:
     return pk.encrypt(
-        msg.encode(),
+        msg,
         padding.OAEP(
             mgf=padding.MGF1(algorithm=hashes.SHA512()),
             algorithm=hashes.SHA512(),
@@ -66,7 +66,7 @@ def decrypt(sk, msg: str) -> str:
 
 alice_encrypted_msg = encrypt(bob_pk, alice_dice_hashed)
 alice_decrypted_msg = decrypt(bob_sk, alice_encrypted_msg)
-bob_encrypted_msg = encrypt(alice_pk, str(bob_dice))
+bob_encrypted_msg = encrypt(alice_pk, str(bob_dice).encode())
 
 
 def sign(sk, msg):
@@ -105,7 +105,7 @@ def main():
     printt(f"Alice and Bob exchanges public keys.")
     printt(f"Alice now proceeds to roll a dice: {alice_dice}")
     printt(f"Bob now proceeds to roll a dice: {bob_dice}")
-    printt(f"Alice now proceeds to convert her dice roll into bits and hashes her answer: {alice_dice_hashed}")
+    printt(f"Alice now proceeds with hashing her answer: {alice_dice_hashed}")
     printt(
         f"Alice now proceeds to encrypt her message using Bob's public key.\nEncrypted message: {alice_encrypted_msg}"
     )
@@ -127,18 +127,20 @@ def main():
         f"Verification of signature: {verify(bob_pk, bob_encrypted_msg_signed, bob_encrypted_msg)}"
     )
     printt(f"Now Alice decrypts the message: {decrypt(alice_sk, bob_encrypted_msg)}")
-    printt(f"Since Alice now has Bob's result, she sends the original random bits used to hash her result along with the "
-           f"result to Bob after she has encrypted and signed the message.")
-    printt(f"Random bits: {alice_random_bit}")
-    printt(f"Original dice result in bits: {alice_dice_to_bits}")
+    printt(
+        f"Since Alice now has Bob's result, she sends the original random bit used to hash her result along with the "
+        f"result to Bob after she has encrypted and signed the message.")
+    printt(f"Random bit: {alice_random_bit}")
+    printt(f"Original dice result: {alice_dice}")
     printt(
         f"Bob receives the messages, verifies the signature and then decrypts the message using his private key and "
         f"receives the following values:\nRandom "
-        f"bits: {alice_random_bit},\nDice Roll in bits: {alice_dice_to_bits}.\nBob then verifies, that the hashed "
+        f"bits: {alice_random_bit},\nDice Roll: {alice_dice}.\nBob then verifies, that the hashed "
         f"result he received before is indeed correct by hashing the newly "
-        f"received pair from Alice and seeing if they match:\nThe received result hash: {alice_dice_hashed}\nThe "
+        f"received pair from Alice and seeing if they match:\nThe received result hash: {alice_dice_hashed}\n\nThe "
         f"newly received "
-        f"pair from Alice hashed: {f'{hash_dice(alice_dice_to_bits, alice_random_bit):08b}'} "
+        f"pair from Alice hashed: {hash_com(alice_dice, alice_random_bit)}\n"
+        f"Does the 2 hashed values match: {'Yes, they do match' if alice_dice_hashed == hash_com(alice_dice, alice_random_bit) else 'No, this is not the original result'}"
     )
     printt(f"Now in order to find the final result, we will apply XOR on both their results: {alice_dice ^ bob_dice}")
 
